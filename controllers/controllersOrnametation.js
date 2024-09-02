@@ -12,14 +12,21 @@ const registerOrnametation = async (req, res) => {
 
     
     try {
+        if (!empresa && !matricula) {
+            return res.status(400).json({mensagem: 'campo obrigatório' }); 
+        }
         if(!codEmpresas.includes(empresa)){
             return res.status(400).json({mensagem: 'Código da empresa não corresponde com a lista do nosso banco'});
         }
 
-        if (sei.length !== 25) {
+        if (sei.length < 25) {
             return res.status(400).json({mensagem: 'SEI incorreto !' }); 
         }
 
+        if (matricula.length !== 10) {
+            return res.status(400).json({mensagem: 'matricula incorreto !' }); 
+        }
+        
         const validarMatricula = `select matricula from ornamentacao where matricula = $1`
 
         const {rowCount} = await pool.query(validarMatricula,[matricula]);
