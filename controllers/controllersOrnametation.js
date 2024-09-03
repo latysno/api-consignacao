@@ -12,27 +12,33 @@ const registerOrnametation = async (req, res) => {
 
     
     try {
-        if (!empresa && !matricula) {
+        if (!empresa) {
             return res.status(400).json({mensagem: 'campo obrigatório' }); 
         }
+
+        if(!matricula){
+            return res.status(400).json({mensagem: 'campo obrigatório' }); 
+        }
+
         if(!codEmpresas.includes(empresa)){
             return res.status(400).json({mensagem: 'Código da empresa não corresponde com a lista do nosso banco'});
         }
+        
+        if (matricula.trim().length !== 10) {
+            return res.status(400).json({mensagem: 'matricula incorreto !' }); 
+        }
 
-        if (sei.length < 25) {
+        if (sei.trim().length < 25) {
             return res.status(400).json({mensagem: 'SEI incorreto !' }); 
         }
 
-        if (matricula.length !== 10) {
-            return res.status(400).json({mensagem: 'matricula incorreto !' }); 
-        }
         
         const validarMatricula = `select matricula from ornamentacao where matricula = $1`
 
         const {rowCount} = await pool.query(validarMatricula,[matricula]);
 
         if(rowCount > 0){
-            return res.status(400).json({mensagem: '...'});
+            return res.status(400).json({mensagem: 'matricula já existe!'});
         }
         
         const {rows} = await pool.query(
@@ -55,6 +61,33 @@ const registerOrnametation = async (req, res) => {
     }
 }
 
+const deleteOrnametation = async (req, res) =>{
+
+    const { matricula } = req.query;
+
+    try {
+            // console.log(matricula);
+
+            const deleteConsignacao = `select * from ornamentacao where matricula = $1`;
+
+            const {rowCount} = await pool.query(deleteConsignacao,[matricula])
+            
+            if (rowCount < 1) {
+                return res.status(404).json({mensagem:`matricula ${matricula} não encontrada no banco de dados`})
+            }
+
+            const deleteQuery = `DELETE FROM ornamentacao WHERE matricula = $1`;
+            await pool.query(deleteQuery, [matricula]);
+
+            return res.status(200).json({ mensagem: `Matrícula ${matricula} deletada com sucesso` });
+
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+
+} 
+
 module.exports = {
-    registerOrnametation
+    registerOrnametation,
+    deleteOrnametation
 }
