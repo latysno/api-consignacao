@@ -1,0 +1,6 @@
+function validateObrigatory(campo){
+
+
+} 
+
+validateObrigatory();

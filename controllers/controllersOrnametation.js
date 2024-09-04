@@ -1,14 +1,20 @@
 const pool = require("../database/connection");
-const {format, isDate} = require ("date-fns");
+const {format, isValid, parseISO, isDate} = require ("date-fns");
 
 const result = (new Date());
 const formattedResult = format(result, 'dd/MM/yyyy');
-// console.log(formattedResult);
+
 
 
 const registerOrnametation = async (req, res) => {
-    const {empresa, matricula, sei} = req.body 
+    const {empresa, matricula, data_ornamentacao, sei} = req.body 
     const codEmpresas = [3, 4, 6, 7, 8, 13, 16, 18, 23, 24];
+
+    const isValidMonthYear = (monthYearString) => {
+        // Regex para validar o formato MM/YYYY
+        const regex = /^(0[1-9]|1[0-2])\/(20\d{2})$/;
+        return regex.test(monthYearString);
+    };
 
     
     try {
@@ -20,9 +26,19 @@ const registerOrnametation = async (req, res) => {
             return res.status(400).json({mensagem: 'campo obrigatório' }); 
         }
 
+        if(!data_ornamentacao){
+            return res.status(400).json({mensagem: 'campo obrigatório' }); 
+        }
+
         if(!codEmpresas.includes(empresa)){
             return res.status(400).json({mensagem: 'Código da empresa não corresponde com a lista do nosso banco'});
         }
+
+
+        if (!isValidMonthYear(data_ornamentacao)){
+            return res.status(400).json({ mensagem: "O formato da data informada deve ser MM/YYYY" });
+        }
+
         
         if (matricula.trim().length !== 10) {
             return res.status(400).json({mensagem: 'matricula incorreto !' }); 
@@ -42,17 +58,11 @@ const registerOrnametation = async (req, res) => {
         }
         
         const {rows} = await pool.query(
-            `insert into ornamentacao (numero_empresa, matricula, data, sei)
+            `insert into ornamentacao (numero_empresa, matricula, data, data_ornamentacao, sei)
             values
-            ($1, $2, $3, $4) returning *
-            `, [empresa, matricula, formattedResult, sei]);
+            ($1, $2, $3, $4, $5) returning *
+            `, [empresa, matricula, formattedResult, data_ornamentacao, sei]);
 
-            // Formatar a data após a inserção
-        const insertedRow = rows[0];
-        const formattedDate = format(new Date(insertedRow.data), 'dd/MM/yyyy');
-
-        // Atualizar o row com a data formatada para a resposta
-        insertedRow.data = formattedDate;
 
             return res.status(201).json(rows[0])
 
