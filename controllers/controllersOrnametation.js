@@ -97,7 +97,70 @@ const deleteOrnametation = async (req, res) =>{
 
 } 
 
+const attOrnametation = async (req, res) => {
+    const {empresa, matricula, data_ornamentacao, sei} = req.body;
+    const codEmpresas = [3, 4, 6, 7, 8, 13, 16, 18, 23, 24];
+
+    // Função para validar o formato MM/YYYY
+    const isValidMonthYear = (monthYearString) => {
+        const regex = /^(0[1-9]|1[0-2])\/(20\d{2})$/;
+        return regex.test(monthYearString);
+    };
+
+    try {
+        // Verificar se a matrícula já existe no banco de dados
+        const validateMatricula = `SELECT * FROM ornamentacao WHERE matricula = $1`;
+        const {rows, rowCount} = await pool.query(validateMatricula, [matricula]);
+
+        if (!empresa) {
+            return res.status(400).json({mensagem: 'Campo obrigatório: empresa'});
+        }
+
+        if (!matricula) {
+            return res.status(400).json({mensagem: 'Campo obrigatório: matrícula'});
+        }
+
+        if (!data_ornamentacao) {
+            return res.status(400).json({mensagem: 'Campo obrigatório: data de ornamentação'});
+        }
+
+        if (!codEmpresas.includes(empresa)) {
+            return res.status(400).json({mensagem: 'Código da empresa não corresponde com a lista do nosso banco'});
+        }
+
+        if (!isValidMonthYear(data_ornamentacao)) {
+            return res.status(400).json({mensagem: 'O formato da data informada deve ser MM/YYYY'});
+        }
+
+        if (sei.trim().length < 25) {
+            return res.status(400).json({mensagem: 'SEI incorreto! Deve ter pelo menos 25 caracteres.'});
+        }
+
+        // Se a matrícula existe, atualize os campos (exceto matrícula)
+        if (rowCount > 0) {
+            const updateQuery = `
+                UPDATE ornamentacao 
+                SET numero_empresa = $1, data_ornamentacao = $2, sei = $3 
+                WHERE matricula = $4 
+                RETURNING *
+            `;
+            const updateValues = [empresa, data_ornamentacao, sei, matricula];
+            const updateResult = await pool.query(updateQuery, updateValues);
+
+            return res.status(200).json({ mensagem: 'Dados atualizados com sucesso!', dados: updateResult.rows });
+
+        } else {
+            return res.status(404).json({ mensagem: 'Matrícula não encontrada no banco de dados.' });
+        }
+
+    } catch (error) {
+        return res.status(500).json({ mensagem: error.message });
+    }
+};
+
+
 module.exports = {
     registerOrnametation,
-    deleteOrnametation
+    deleteOrnametation,
+    attOrnametation
 }
