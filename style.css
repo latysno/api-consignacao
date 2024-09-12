@@ -1,0 +1,9 @@
+.valid {
+    border-color: #10B981; /* Green */
+}
+.invalid {
+    border-color: #EF4444; /* Red */
+}
+input {
+    background-color: #131516;
+}
