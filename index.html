@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro de Informações</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-black text-white flex items-center justify-center h-screen">
+    <div class="w-full max-w-md">
+        <!-- Formulário de Inclusão/Edição -->
+        <form id="inclusaoForm" class="bg-gray-800 shadow-md rounded px-8 pt-6 pb-8 mb-4">
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2" for="empresa">Empresa</label>
+                <input id="empresa" type="text" maxlength="2" placeholder="00" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2" for="matricula">Matrícula</label>
+                <input id="matricula" type="text" maxlength="10" placeholder="XXXXXXXXXX" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2" for="data">Data de Ornamentação (MM/AAAA)</label>
+                <input id="data" type="text" maxlength="7" placeholder="MM/AAAA" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2" for="sei">SEI</label>
+                <input id="sei" type="text" maxlength="25" placeholder="XXXXXXXXXXXXXXXXXXXXXXXXX" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div class="flex items-center justify-between">
+                <button id="incluirBtn" type="button" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Incluir</button>
+                <button id="excluirBtn" type="button" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Excluir</button>
+                <button id="editarBtn" type="button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Editar</button>
+            </div>
+        </form>
+
+        <!-- Tela de confirmação de edição -->
+        <form id="editarForm" class="bg-gray-800 shadow-md rounded px-8 pt-6 pb-8 mb-4 hidden">
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2" for="matriculaEdit">Matrícula</label>
+                <input id="matriculaEdit" type="text" readonly class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2" for="campoAlterar">Escolha os campos para alterar</label>
+                <!-- Permitir múltiplas seleções de campos -->
+                <select id="campoAlterar" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" multiple>
+                    <option value="empresa">Empresa</option>
+                    <option value="data_ornamentacao">Data de Ornamentação</option>
+                    <option value="sei">SEI</option>
+                </select>
+            </div>
+            <!-- Div para os campos de edição selecionados -->
+            <div id="camposParaEdicao" class="mb-4"></div>
+            <div class="flex items-center justify-between">
+                <button id="confirmarEdicaoBtn" type="button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Confirmar Edição</button>
+                <button id="cancelarEdicaoBtn" type="button" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancelar</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const apiUrl = 'http://localhost:8080/consignacao';
+
+        // Formatar automaticamente o campo de data para MM/YYYY
+        document.getElementById('data').addEventListener('input', function (e) {
+            let value = e.target.value;
+    
+            // Remove todos os caracteres que não são números, exceto "/"
+            value = value.replace(/[^\d\/]/g, '');
+    
+            // Verifica se já há uma barra "/" após o segundo dígito e adiciona caso não haja
+            if (value.length > 2 && value.indexOf('/') === -1) {
+                value = value.slice(0, 2) + '/' + value.slice(2);
+            }
+    
+            // Limita o valor ao formato "MM/YYYY"
+            if (value.length > 7) {
+                value = value.slice(0, 7);
+            }
+    
+            // Atualiza o campo de entrada com o valor formatado
+            e.target.value = value;
+        });      
+
+        // Validar e formatar a entrada do código da empresa
+        document.getElementById('empresa').addEventListener('input', function (e) {
+            // Remove tudo que não for dígito
+            e.target.value = e.target.value.replace(/\D/g, "");
+        });
+    
+        // Função para criar um novo registro (POST) com confirmação
+        async function incluirOrnamentacao() {
+            const empresa = Number(document.getElementById('empresa').value);
+            const matricula = document.getElementById('matricula').value;
+            const data = document.getElementById('data').value;
+            const sei = document.getElementById('sei').value;
+        
+            if (!empresa || !matricula || !data || !sei) {
+                alert("Preencha todos os campos.");
+                return;
+            }
+        
+            // Verificar se a data está no formato MM/YYYY
+            if (!/^(0[1-9]|1[0-2])\/(20\d{2})$/.test(data)) {
+                alert("O formato da data deve ser MM/YYYY.");
+                return;
+            }
+        
+            // Verificar se o código da empresa é válido
+            const codEmpresasValidas = [3, 4, 6, 7, 8, 13, 16, 18, 23, 24];
+            if (!codEmpresasValidas.includes(empresa)) {
+                alert("Código da empresa inválido.");
+                return;
+            }
+        
+            const confirmacao = confirm(`Confirme os dados:\nEmpresa: ${empresa}\nMatrícula: ${matricula}\nData: ${data}\nSEI: ${sei}`);
+            if (!confirmacao) return;
+        
+            const payload = { empresa, matricula, data_ornamentacao: data, sei };
+        
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+        
+                const result = await response.json();
+                alert(result.mensagem);
+            } catch (error) {
+                alert('Erro ao incluir o registro: ' + error.message);
+            }
+        }
+
+        // Função para excluir um registro (DELETE) com confirmação
+        async function excluirOrnamentacao() {
+            const matricula = document.getElementById('matricula').value;
+
+            if (!matricula) {
+                alert("Matrícula é obrigatória para excluir.");
+                return;
+            }
+
+            const confirmacao = confirm(`Tem certeza que deseja excluir a matrícula ${matricula}?`);
+            if (!confirmacao) return;
+
+            try {
+                const response = await fetch(`${apiUrl}?matricula=${matricula}`, { method: 'DELETE' });
+
+                const result = await response.json();
+                alert(result.mensagem);
+            } catch (error) {
+                alert('Erro ao excluir o registro: ' + error.message);
+            }
+        }
+
+        // Função para editar um registro (PUT)
+        async function editarOrnamentacao() {
+            const matricula = document.getElementById('matricula').value;
+
+            if (!matricula) {
+                alert("Matrícula é obrigatória para edição.");
+                return;
+            }
+
+            // Exibir a tela de seleção de campo para edição
+            document.getElementById('matriculaEdit').value = matricula;
+            document.getElementById('inclusaoForm').classList.add('hidden');
+            document.getElementById('editarForm').classList.remove('hidden');
+        }
+
+        // Função para confirmar a edição
+        async function confirmarEdicao() {
+            const matricula = document.getElementById('matriculaEdit').value;
+            const camposSelecionados = Array.from(document.getElementById('campoAlterar').selectedOptions).map(option => option.value);
+            const payload = { matricula };
+    
+            // Variável para controlar se há erros na validação
+            let erroValidacao = false;
+    
+            // Validação dos campos selecionados
+            camposSelecionados.forEach(campo => {
+                const novoValor = document.getElementById(`novoValor_${campo}`).value;
+                if (!novoValor) {
+                    alert(`Preencha o novo valor para o campo: ${campo}`);
+                    erroValidacao = true;
+                    return;
+                }
+    
+                // Validações específicas por campo
+                if (campo === 'empresa') {
+                    if (isNaN(novoValor) || novoValor.length !== 2) {
+                        alert('O código da empresa deve ter 2 dígitos.');
+                        erroValidacao = true;
+                        return;
+                    }
+                    payload[campo] = Number(novoValor); // Converte para número
+                } else if (campo === 'data_ornamentacao') {
+                    if (!/^(0[1-9]|1[0-2])\/(20\d{2})$/.test(novoValor)) {
+                        alert('A data deve estar no formato MM/YYYY.');
+                        erroValidacao = true;
+                        return;
+                    }
+                    payload[campo] = novoValor;
+                } else {
+                    payload[campo] = novoValor;
+                }
+            });
+    
+            // Se houve erro de validação, interrompe o processo
+            if (erroValidacao) {
+                return;
+            }
+    
+            // Enviar os dados se não houver erro de validação
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+    
+                const result = await response.json();
+                
+                // Se a edição foi bem sucedida, volta para a tela principal
+                if (response.ok) {
+                    alert(result.mensagem);
+                    document.getElementById('inclusaoForm').classList.remove('hidden');
+                    document.getElementById('editarForm').classList.add('hidden');
+                } else {
+                    alert('Erro ao atualizar o registro: ' + result.mensagem);
+                }
+            } catch (error) {
+                alert('Erro ao atualizar o registro: ' + error.message);
+            }
+        }
+
+        // Exibir campos de edição baseados nas seleções
+        document.getElementById('campoAlterar').addEventListener('change', function () {
+            const camposSelecionados = Array.from(this.selectedOptions).map(option => option.value);
+            const container = document.getElementById('camposParaEdicao');
+        
+            container.innerHTML = ''; // Limpar campos anteriores
+            camposSelecionados.forEach(campo => {
+                const label = document.createElement('label');
+                label.className = 'block text-sm font-bold mb-2';
+                label.innerText = `Novo valor para ${campo}`;
+                label.setAttribute('for', `novoValor_${campo}`);
+        
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = `novoValor_${campo}`;
+                input.className = 'shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mb-4';
+        
+                // Adicionar atributos de validação baseados no tipo de campo
+                if (campo === 'empresa') {
+                    input.maxLength = 2;
+                    input.placeholder = '00';
+                } else if (campo === 'data_ornamentacao') {
+                    input.maxLength = 7;
+                    input.placeholder = 'MM/AAAA';
+                } else if (campo === 'sei') {
+                    input.maxLength = 25;
+                    input.placeholder = 'XXXXXXXXXXXXXXXXXXXXXXXXX';
+                }
+        
+                container.appendChild(label);
+                container.appendChild(input);
+            });
+        });
+
+        // Cancelar a edição
+        document.getElementById('cancelarEdicaoBtn').addEventListener('click', function () {
+            document.getElementById('inclusaoForm').classList.remove('hidden');
+            document.getElementById('editarForm').classList.add('hidden');
+        });
+
+        document.getElementById('incluirBtn').addEventListener('click', incluirOrnamentacao);
+        document.getElementById('excluirBtn').addEventListener('click', excluirOrnamentacao);
+        document.getElementById('editarBtn').addEventListener('click', editarOrnamentacao);
+        document.getElementById('confirmarEdicaoBtn').addEventListener('click', confirmarEdicao);
+    </script>
+</body>
+</html>
