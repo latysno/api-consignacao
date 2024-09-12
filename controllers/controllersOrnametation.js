@@ -1,158 +1,139 @@
 const pool = require("../database/connection");
-const {format, isValid, parseISO, isDate} = require ("date-fns");
+const { format } = require("date-fns");
 
 const result = (new Date());
 const formattedResult = format(result, 'dd/MM/yyyy');
 
 
 
+// Inclusão com validação de matrícula existente
 const registerOrnametation = async (req, res) => {
-    const {empresa, matricula, data_ornamentacao, sei} = req.body 
+    const { empresa, matricula, data_ornamentacao, sei } = req.body;
     const codEmpresas = [3, 4, 6, 7, 8, 13, 16, 18, 23, 24];
 
     const isValidMonthYear = (monthYearString) => {
-        // Regex para validar o formato MM/YYYY
-        const regex = /^(0[1-9]|1[0-2])\/(20\d{2})$/;
-        return regex.test(monthYearString);
-    };
-
-    
-    try {
-        if (!empresa) {
-            return res.status(400).json({mensagem: 'campo obrigatório' }); 
-        }
-
-        if(!matricula){
-            return res.status(400).json({mensagem: 'campo obrigatório' }); 
-        }
-
-        if(!data_ornamentacao){
-            return res.status(400).json({mensagem: 'campo obrigatório' }); 
-        }
-
-        if(!codEmpresas.includes(empresa)){
-            return res.status(400).json({mensagem: 'Código da empresa não corresponde com a lista do nosso banco'});
-        }
-
-
-        if (!isValidMonthYear(data_ornamentacao)){
-            return res.status(400).json({ mensagem: "O formato da data informada deve ser MM/YYYY" });
-        }
-
-        
-        if (matricula.trim().length !== 10) {
-            return res.status(400).json({mensagem: 'matricula incorreto !' }); 
-        }
-
-        if (sei.trim().length < 25) {
-            return res.status(400).json({mensagem: 'SEI incorreto !' }); 
-        }
-
-        
-        const validarMatricula = `select matricula from ornamentacao where matricula = $1`
-
-        const {rowCount} = await pool.query(validarMatricula,[matricula]);
-
-        if(rowCount > 0){
-            return res.status(400).json({mensagem: 'matricula já existe!'});
-        }
-        
-        const {rows} = await pool.query(
-            `insert into ornamentacao (numero_empresa, matricula, data, data_ornamentacao, sei)
-            values
-            ($1, $2, $3, $4, $5) returning *
-            `, [empresa, matricula, formattedResult, data_ornamentacao, sei]);
-
-
-            return res.status(201).json(rows[0])
-
-    } catch (error) {
-        return res.status(500).json({ message: error.message })
-    }
-}
-
-const deleteOrnametation = async (req, res) =>{
-
-    const { matricula } = req.query;
-
-    try {
-            // console.log(matricula);
-
-            const deleteConsignacao = `select * from ornamentacao where matricula = $1`;
-
-            const {rowCount} = await pool.query(deleteConsignacao,[matricula])
-            
-            if (rowCount < 1) {
-                return res.status(404).json({mensagem:`matricula ${matricula} não encontrada no banco de dados`})
-            }
-
-            const deleteQuery = `DELETE FROM ornamentacao WHERE matricula = $1`;
-            await pool.query(deleteQuery, [matricula]);
-
-            return res.status(200).json({ mensagem: `Matrícula ${matricula} deletada com sucesso` });
-
-    } catch (error) {
-        return res.status(500).json({ message: error.message })
-    }
-
-} 
-
-const attOrnametation = async (req, res) => {
-    const {empresa, matricula, data_ornamentacao, sei} = req.body;
-    const codEmpresas = [3, 4, 6, 7, 8, 13, 16, 18, 23, 24];
-
-    // Função para validar o formato MM/YYYY
-    const isValidMonthYear = (monthYearString) => {
-        const regex = /^(0[1-9]|1[0-2])\/(20\d{2})$/;
+        const regex = /^(0[1-9]|1[0-2])\/(19[6-9][0-9]|20[0-9]{2}|2100)$/;
         return regex.test(monthYearString);
     };
 
     try {
-        // Verificar se a matrícula já existe no banco de dados
-        const validateMatricula = `SELECT * FROM ornamentacao WHERE matricula = $1`;
-        const {rows, rowCount} = await pool.query(validateMatricula, [matricula]);
-
-        if (!empresa) {
-            return res.status(400).json({mensagem: 'Campo obrigatório: empresa'});
-        }
-
-        if (!matricula) {
-            return res.status(400).json({mensagem: 'Campo obrigatório: matrícula'});
-        }
-
-        if (!data_ornamentacao) {
-            return res.status(400).json({mensagem: 'Campo obrigatório: data de ornamentação'});
+        if (!empresa || !matricula || !data_ornamentacao || !sei) {
+            return res.status(400).json({ mensagem: 'Preencha todos os campos obrigatórios' });
         }
 
         if (!codEmpresas.includes(empresa)) {
-            return res.status(400).json({mensagem: 'Código da empresa não corresponde com a lista do nosso banco'});
+            return res.status(400).json({ mensagem: 'Código da empresa inválido' });
         }
 
         if (!isValidMonthYear(data_ornamentacao)) {
-            return res.status(400).json({mensagem: 'O formato da data informada deve ser MM/YYYY'});
+            return res.status(400).json({ mensagem: 'O formato da data informada deve ser MM/YYYY' });
+        }
+
+        if (matricula.trim().length !== 10) {
+            return res.status(400).json({ mensagem: 'Matrícula deve ter 10 caracteres' });
         }
 
         if (sei.trim().length < 25) {
-            return res.status(400).json({mensagem: 'SEI incorreto! Deve ter pelo menos 25 caracteres.'});
+            return res.status(400).json({ mensagem: 'SEI incorreto! Deve ter pelo menos 25 caracteres.' });
         }
 
-        // Se a matrícula existe, atualize os campos (exceto matrícula)
+        // Verifica se a matrícula já existe
+        const { rowCount } = await pool.query('SELECT 1 FROM ornamentacao WHERE matricula = $1', [matricula]);
         if (rowCount > 0) {
-            const updateQuery = `
-                UPDATE ornamentacao 
-                SET numero_empresa = $1, data_ornamentacao = $2, sei = $3 
-                WHERE matricula = $4 
-                RETURNING *
-            `;
-            const updateValues = [empresa, data_ornamentacao, sei, matricula];
-            const updateResult = await pool.query(updateQuery, updateValues);
+            return res.status(400).json({ mensagem: 'Matrícula já existe!' });
+        }
 
-            return res.status(200).json({ mensagem: 'Dados atualizados com sucesso!', dados: updateResult.rows });
+        const { rows } = await pool.query(
+            `INSERT INTO ornamentacao (numero_empresa, matricula, data, data_ornamentacao, sei)
+            VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [empresa, matricula, formattedResult, data_ornamentacao, sei]
+        );
 
-        } else {
+        return res.status(201).json({ mensagem: 'Registro incluído com sucesso!', dados: rows[0] });
+    } catch (error) {
+        return res.status(500).json({ mensagem: error.message });
+    }
+};
+
+
+// Exclusão com resposta correta
+const deleteOrnametation = async (req, res) => {
+    const { matricula } = req.query;
+
+    try {
+        const { rowCount } = await pool.query('SELECT 1 FROM ornamentacao WHERE matricula = $1', [matricula]);
+
+        if (rowCount === 0) {
             return res.status(404).json({ mensagem: 'Matrícula não encontrada no banco de dados.' });
         }
 
+        await pool.query('DELETE FROM ornamentacao WHERE matricula = $1', [matricula]);
+        return res.status(200).json({ mensagem: `Matrícula ${matricula} deletada com sucesso` });
+    } catch (error) {
+        return res.status(500).json({ mensagem: error.message });
+    }
+};
+
+
+// Edição com atualização parcial
+const attOrnametation = async (req, res) => {
+    const { empresa, matricula, data_ornamentacao, sei } = req.body;
+    const codEmpresas = [3, 4, 6, 7, 8, 13, 16, 18, 23, 24];
+
+    const isValidMonthYear = (monthYearString) => {
+        const regex = /^(0[1-9]|1[0-2])\/(19[6-9][0-9]|20[0-9]{2}|2100)$/;
+        return regex.test(monthYearString);
+    };
+
+    try {
+        if (!matricula) {
+            return res.status(400).json({ mensagem: 'Campo obrigatório: matrícula' });
+        }
+
+        const { rowCount } = await pool.query('SELECT 1 FROM ornamentacao WHERE matricula = $1', [matricula]);
+        if (rowCount === 0) {
+            return res.status(404).json({ mensagem: 'Matrícula não encontrada no banco de dados.' });
+        }
+
+        const fieldsToUpdate = [];
+        const valuesToUpdate = [];
+
+        if (empresa) {
+            if (!codEmpresas.includes(empresa)) {
+                return res.status(400).json({ mensagem: 'Código da empresa inválido' });
+            }
+            fieldsToUpdate.push('numero_empresa');
+            valuesToUpdate.push(empresa);
+        }
+
+        if (data_ornamentacao) {
+            if (!isValidMonthYear(data_ornamentacao)) {
+                return res.status(400).json({ mensagem: 'O formato da data informada deve ser MM/YYYY' });
+            }
+            fieldsToUpdate.push('data_ornamentacao');
+            valuesToUpdate.push(data_ornamentacao);
+        }
+
+        if (sei) {
+            if (sei.trim().length < 25) {
+                return res.status(400).json({ mensagem: 'SEI incorreto! Deve ter pelo menos 25 caracteres.' });
+            }
+            fieldsToUpdate.push('sei');
+            valuesToUpdate.push(sei);
+        }
+
+        if (fieldsToUpdate.length === 0) {
+            return res.status(400).json({ mensagem: 'Nenhum campo para atualizar foi fornecido' });
+        }
+
+        // Gerar query dinâmica
+        const setClause = fieldsToUpdate.map((field, index) => `${field} = $${index + 1}`).join(', ');
+        const updateQuery = `UPDATE ornamentacao SET ${setClause} WHERE matricula = $${fieldsToUpdate.length + 1} RETURNING *`;
+
+        valuesToUpdate.push(matricula);
+        const { rows: updatedRows } = await pool.query(updateQuery, valuesToUpdate);
+
+        return res.status(200).json({ mensagem: 'Dados atualizados com sucesso!', dados: updatedRows[0] });
     } catch (error) {
         return res.status(500).json({ mensagem: error.message });
     }
