@@ -37,11 +37,11 @@
         <!-- Tela de confirmação de edição -->
         <form id="editarForm" class="bg-gray-800 shadow-md rounded px-8 pt-6 pb-8 mb-4 hidden">
             <div class="mb-4">
-                <label class="block text-sm font-bold mb-2" for="matriculaEdit">Matrícula</label>
+                <label class="block text-sm font-bold mb-2" for="matriculaEdit">Matrícula que será editada:</label>
                 <input id="matriculaEdit" type="text" readonly class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
             <div class="mb-4">
-                <label class="block text-sm font-bold mb-2" for="campoAlterar">Escolha os campos para alterar</label>
+                <label class="block text-sm font-bold mb-2" for="campoAlterar">Realize a edição clicando nos campos abaixo:</label>
                 <!-- Permitir múltiplas seleções de campos -->
                 <select id="campoAlterar" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" multiple>
                     <option value="empresa">Empresa</option>
@@ -53,7 +53,7 @@
             <div id="camposParaEdicao" class="mb-4"></div>
             <div class="flex items-center justify-between">
                 <button id="confirmarEdicaoBtn" type="button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Confirmar Edição</button>
-                <button id="cancelarEdicaoBtn" type="button" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cancelar</button>
+                <button id="cancelarEdicaoBtn" type="button" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Voltar</button>
             </div>
         </form>
     </div>
@@ -88,51 +88,64 @@
             e.target.value = e.target.value.replace(/\D/g, "");
         });
     
-        // Função para criar um novo registro (POST) com confirmação
+        // Função para limpar todos os campos do formulário
+        function limparCamposFormulario() {
+            document.getElementById('empresa').value = '';
+            document.getElementById('matricula').value = '';
+            document.getElementById('data').value = '';
+            document.getElementById('sei').value = '';
+        }
+
+        // Função para criar um novo registro (POST) com confirmação e limpar campos após sucesso
         async function incluirOrnamentacao() {
             const empresa = Number(document.getElementById('empresa').value);
             const matricula = document.getElementById('matricula').value;
             const data = document.getElementById('data').value;
             const sei = document.getElementById('sei').value;
-        
-            if (!empresa || !matricula || !data || !sei) {
-                alert("Preencha todos os campos.");
+
+            if (!empresa || !matricula || !data) {
+                alert("Preencha todos os campos obrigatórios.");
                 return;
             }
-        
+
             // Verificar se a data está no formato MM/YYYY
             if (!/^(0[1-9]|1[0-2])\/(20\d{2})$/.test(data)) {
                 alert("O formato da data deve ser MM/YYYY.");
                 return;
             }
-        
+
             // Verificar se o código da empresa é válido
             const codEmpresasValidas = [3, 4, 6, 7, 8, 13, 16, 18, 23, 24];
             if (!codEmpresasValidas.includes(empresa)) {
                 alert("Código da empresa inválido.");
                 return;
             }
-        
+
             const confirmacao = confirm(`Confirme os dados:\nEmpresa: ${empresa}\nMatrícula: ${matricula}\nData: ${data}\nSEI: ${sei}`);
             if (!confirmacao) return;
-        
+
             const payload = { empresa, matricula, data_ornamentacao: data, sei };
-        
+
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
-        
+
                 const result = await response.json();
                 alert(result.mensagem);
+
+                // Se a inclusão for bem-sucedida, limpar campos
+                if (response.ok) {
+                    limparCamposFormulario();
+                }
             } catch (error) {
                 alert('Erro ao incluir o registro: ' + error.message);
             }
         }
 
-        // Função para excluir um registro (DELETE) com confirmação
+        // Função para excluir um registro (DELETE) com confirmação e limpar campos após sucesso
         async function excluirOrnamentacao() {
             const matricula = document.getElementById('matricula').value;
 
@@ -149,6 +162,11 @@
 
                 const result = await response.json();
                 alert(result.mensagem);
+
+                // Se a exclusão for bem-sucedida, limpar campos
+                if (response.ok) {
+                    limparCamposFormulario();
+                }
             } catch (error) {
                 alert('Erro ao excluir o registro: ' + error.message);
             }
@@ -169,16 +187,21 @@
             document.getElementById('editarForm').classList.remove('hidden');
         }
 
+        // Função para limpar os campos de edição sem sair da tela de edição
+        function resetarCamposEdicao() {
+            const camposParaEdicao = document.getElementById('camposParaEdicao');
+            camposParaEdicao.innerHTML = ''; // Limpar os campos de edição
+            document.getElementById('campoAlterar').selectedIndex = -1; // Resetar a seleção dos campos
+        }
+
         // Função para confirmar a edição
         async function confirmarEdicao() {
             const matricula = document.getElementById('matriculaEdit').value;
             const camposSelecionados = Array.from(document.getElementById('campoAlterar').selectedOptions).map(option => option.value);
             const payload = { matricula };
-    
-            // Variável para controlar se há erros na validação
+
             let erroValidacao = false;
-    
-            // Validação dos campos selecionados
+
             camposSelecionados.forEach(campo => {
                 const novoValor = document.getElementById(`novoValor_${campo}`).value;
                 if (!novoValor) {
@@ -186,15 +209,14 @@
                     erroValidacao = true;
                     return;
                 }
-    
-                // Validações específicas por campo
+
                 if (campo === 'empresa') {
                     if (isNaN(novoValor) || novoValor.length !== 2) {
                         alert('O código da empresa deve ter 2 dígitos.');
                         erroValidacao = true;
                         return;
                     }
-                    payload[campo] = Number(novoValor); // Converte para número
+                    payload[campo] = Number(novoValor);
                 } else if (campo === 'data_ornamentacao') {
                     if (!/^(0[1-9]|1[0-2])\/(20\d{2})$/.test(novoValor)) {
                         alert('A data deve estar no formato MM/YYYY.');
@@ -206,27 +228,25 @@
                     payload[campo] = novoValor;
                 }
             });
-    
-            // Se houve erro de validação, interrompe o processo
+
             if (erroValidacao) {
                 return;
             }
-    
-            // Enviar os dados se não houver erro de validação
+
             try {
                 const response = await fetch(apiUrl, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
-    
+
                 const result = await response.json();
-                
-                // Se a edição foi bem sucedida, volta para a tela principal
+
                 if (response.ok) {
                     alert(result.mensagem);
-                    document.getElementById('inclusaoForm').classList.remove('hidden');
-                    document.getElementById('editarForm').classList.add('hidden');
+
+                    // Resetar a tela de edição sem sair dela
+                    resetarCamposEdicao();
                 } else {
                     alert('Erro ao atualizar o registro: ' + result.mensagem);
                 }
@@ -234,6 +254,7 @@
                 alert('Erro ao atualizar o registro: ' + error.message);
             }
         }
+
 
         // Exibir campos de edição baseados nas seleções
         document.getElementById('campoAlterar').addEventListener('change', function () {
