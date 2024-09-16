@@ -1,10 +1,8 @@
 const pool = require("../database/connection");
 const { format } = require("date-fns");
 
-const result = (new Date());
+const result = new Date();
 const formattedResult = format(result, 'dd/MM/yyyy');
-
-
 
 // Inclusão com validação de matrícula existente
 const registerOrnametation = async (req, res) => {
@@ -17,7 +15,7 @@ const registerOrnametation = async (req, res) => {
     };
 
     try {
-        if (!empresa || !matricula || !data_ornamentacao || !sei) {
+        if (!empresa || !matricula || !data_ornamentacao) {
             return res.status(400).json({ mensagem: 'Preencha todos os campos obrigatórios' });
         }
 
@@ -33,8 +31,8 @@ const registerOrnametation = async (req, res) => {
             return res.status(400).json({ mensagem: 'Matrícula deve ter 10 caracteres' });
         }
 
-        if (sei.trim().length < 25) {
-            return res.status(400).json({ mensagem: 'SEI incorreto! Deve ter pelo menos 25 caracteres.' });
+        if (sei && sei.trim().length > 25) {
+            return res.status(400).json({ mensagem: 'SEI pode ter no máximo 25 caracteres.' });
         }
 
         // Verifica se a matrícula já existe
@@ -46,7 +44,7 @@ const registerOrnametation = async (req, res) => {
         const { rows } = await pool.query(
             `INSERT INTO ornamentacao (numero_empresa, matricula, data, data_ornamentacao, sei)
             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-            [empresa, matricula, formattedResult, data_ornamentacao, sei]
+            [empresa, matricula, formattedResult, data_ornamentacao, sei || null]
         );
 
         return res.status(201).json({ mensagem: 'Registro incluído com sucesso!', dados: rows[0] });
@@ -54,7 +52,6 @@ const registerOrnametation = async (req, res) => {
         return res.status(500).json({ mensagem: error.message });
     }
 };
-
 
 // Exclusão com resposta correta
 const deleteOrnametation = async (req, res) => {
@@ -73,7 +70,6 @@ const deleteOrnametation = async (req, res) => {
         return res.status(500).json({ mensagem: error.message });
     }
 };
-
 
 // Edição com atualização parcial
 const attOrnametation = async (req, res) => {
@@ -115,8 +111,8 @@ const attOrnametation = async (req, res) => {
         }
 
         if (sei) {
-            if (sei.trim().length < 25) {
-                return res.status(400).json({ mensagem: 'SEI incorreto! Deve ter pelo menos 25 caracteres.' });
+            if (sei.trim().length > 25) {
+                return res.status(400).json({ mensagem: 'SEI pode ter no máximo 25 caracteres.' });
             }
             fieldsToUpdate.push('sei');
             valuesToUpdate.push(sei);
@@ -139,9 +135,8 @@ const attOrnametation = async (req, res) => {
     }
 };
 
-
 module.exports = {
     registerOrnametation,
     deleteOrnametation,
-    attOrnametation
-}
+    attOrnametation,
+};
