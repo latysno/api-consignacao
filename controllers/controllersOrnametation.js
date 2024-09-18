@@ -1,10 +1,11 @@
+// controllers/controllersOrnametation.js
 const pool = require("../database/connection");
 const { format } = require("date-fns");
 
 const result = new Date();
 const formattedResult = format(result, 'dd/MM/yyyy');
 
-// Inclusão com validação de matrícula existente
+// Inclusão com validação de matrícula e empresa existente
 const registerOrnametation = async (req, res) => {
     const { empresa, matricula, data_ornamentacao, sei } = req.body;
     const codEmpresas = [3, 4, 6, 7, 8, 13, 16, 18, 23, 24];
@@ -35,10 +36,13 @@ const registerOrnametation = async (req, res) => {
             return res.status(400).json({ mensagem: 'SEI pode ter no máximo 25 caracteres.' });
         }
 
-        // Verifica se a matrícula já existe
-        const { rowCount } = await pool.query('SELECT 1 FROM ornamentacao WHERE matricula = $1', [matricula]);
+        // Verifica se a matrícula já existe para a mesma empresa
+        const { rowCount } = await pool.query(
+            'SELECT 1 FROM ornamentacao WHERE matricula = $1 AND numero_empresa = $2', 
+            [matricula, empresa]
+        );
         if (rowCount > 0) {
-            return res.status(400).json({ mensagem: 'Matrícula já existe!' });
+            return res.status(400).json({ mensagem: 'Matrícula já existe para essa empresa!' });
         }
 
         const { rows } = await pool.query(
@@ -55,17 +59,20 @@ const registerOrnametation = async (req, res) => {
 
 // Exclusão com resposta correta
 const deleteOrnametation = async (req, res) => {
-    const { matricula } = req.query;
+    const { matricula, empresa } = req.query;
 
     try {
-        const { rowCount } = await pool.query('SELECT 1 FROM ornamentacao WHERE matricula = $1', [matricula]);
+        const { rowCount } = await pool.query(
+            'SELECT 1 FROM ornamentacao WHERE matricula = $1 AND numero_empresa = $2', 
+            [matricula, empresa]
+        );
 
         if (rowCount === 0) {
-            return res.status(404).json({ mensagem: 'Matrícula não encontrada no banco de dados.' });
+            return res.status(404).json({ mensagem: 'Matrícula não encontrada para essa empresa.' });
         }
 
-        await pool.query('DELETE FROM ornamentacao WHERE matricula = $1', [matricula]);
-        return res.status(200).json({ mensagem: `Matrícula ${matricula} deletada com sucesso` });
+        await pool.query('DELETE FROM ornamentacao WHERE matricula = $1 AND numero_empresa = $2', [matricula, empresa]);
+        return res.status(200).json({ mensagem: `Matrícula ${matricula} da empresa ${empresa} deletada com sucesso` });
     } catch (error) {
         return res.status(500).json({ mensagem: error.message });
     }
@@ -82,13 +89,16 @@ const attOrnametation = async (req, res) => {
     };
 
     try {
-        if (!matricula) {
-            return res.status(400).json({ mensagem: 'Campo obrigatório: matrícula' });
+        if (!matricula || !empresa) {
+            return res.status(400).json({ mensagem: 'Campos obrigatórios: matrícula e empresa' });
         }
 
-        const { rowCount } = await pool.query('SELECT 1 FROM ornamentacao WHERE matricula = $1', [matricula]);
+        const { rowCount } = await pool.query(
+            'SELECT 1 FROM ornamentacao WHERE matricula = $1 AND numero_empresa = $2', 
+            [matricula, empresa]
+        );
         if (rowCount === 0) {
-            return res.status(404).json({ mensagem: 'Matrícula não encontrada no banco de dados.' });
+            return res.status(404).json({ mensagem: 'Matrícula não encontrada para essa empresa.' });
         }
 
         const fieldsToUpdate = [];
@@ -124,9 +134,10 @@ const attOrnametation = async (req, res) => {
 
         // Gerar query dinâmica
         const setClause = fieldsToUpdate.map((field, index) => `${field} = $${index + 1}`).join(', ');
-        const updateQuery = `UPDATE ornamentacao SET ${setClause} WHERE matricula = $${fieldsToUpdate.length + 1} RETURNING *`;
+        const updateQuery = `UPDATE ornamentacao SET ${setClause} WHERE matricula = $${fieldsToUpdate.length + 1} AND numero_empresa = $${fieldsToUpdate.length + 2} RETURNING *`;
 
         valuesToUpdate.push(matricula);
+        valuesToUpdate.push(empresa);
         const { rows: updatedRows } = await pool.query(updateQuery, valuesToUpdate);
 
         return res.status(200).json({ mensagem: 'Dados atualizados com sucesso!', dados: updatedRows[0] });
