@@ -56,6 +56,17 @@
                 <button id="cancelarEdicaoBtn" type="button" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Voltar</button>
             </div>
         </form>
+
+        <form id="uploadForm" class="bg-gray-800 shadow-md rounded px-8 pt-6 pb-8 mb-4" enctype="multipart/form-data">
+            <div class="mb-4">
+                <label class="block text-sm font-bold mb-2" for="file">Upload do arquivo .txt</label>
+                <input id="file" type="file" accept=".txt" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div class="flex items-center justify-between">
+                <button id="uploadBtn" type="button" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Enviar Arquivo</button>
+            </div>
+        </form>
+
     </div>
 
     <script>
@@ -147,23 +158,24 @@
 
         // Função para excluir um registro (DELETE) com confirmação e limpar campos após sucesso
         async function excluirOrnamentacao() {
+            const empresa = Number(document.getElementById('empresa').value); // Capturar o valor do campo empresa
             const matricula = document.getElementById('matricula').value;
-
-            if (!matricula) {
-                alert("Matrícula é obrigatória para excluir.");
+        
+            if (!empresa || !matricula) {
+                alert("Empresa e matrícula são obrigatórias para excluir.");
                 return;
             }
-
-            const confirmacao = confirm(`Tem certeza que deseja excluir a matrícula ${matricula}?`);
+        
+            const confirmacao = confirm(`Tem certeza que deseja excluir a matrícula ${matricula} da empresa ${empresa}?`);
             if (!confirmacao) return;
-
+        
             try {
-                const response = await fetch(`${apiUrl}?matricula=${matricula}`, { method: 'DELETE' });
-
+                // Adicionar empresa na query da URL
+                const response = await fetch(`${apiUrl}?matricula=${matricula}&empresa=${empresa}`, { method: 'DELETE' });
+        
                 const result = await response.json();
                 alert(result.mensagem);
-
-                // Se a exclusão for bem-sucedida, limpar campos
+        
                 if (response.ok) {
                     limparCamposFormulario();
                 }
@@ -171,7 +183,7 @@
                 alert('Erro ao excluir o registro: ' + error.message);
             }
         }
-
+        
         // Função para editar um registro (PUT)
         async function editarOrnamentacao() {
             const matricula = document.getElementById('matricula').value;
@@ -289,6 +301,44 @@
                 container.appendChild(input);
             });
         });
+
+
+        document.getElementById('uploadBtn').addEventListener('click', async function () {
+            const fileInput = document.getElementById('file');
+            if (!fileInput.files.length) {
+                alert('Por favor, selecione um arquivo.');
+                return;
+            }
+    
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+    
+            try {
+                const response = await fetch('http://localhost:8080/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+    
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'resultado.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const result = await response.json();
+                    alert(result.mensagem);
+                }
+            } catch (error) {
+                alert('Erro ao enviar o arquivo: ' + error.message);
+            }
+        });
+
+
 
         // Cancelar a edição
         document.getElementById('cancelarEdicaoBtn').addEventListener('click', function () {
